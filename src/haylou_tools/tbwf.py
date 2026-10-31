@@ -22,7 +22,8 @@ WHITE = -1
 GOLD = -15795
 BLANK_RESOURCE = 24
 BATTERY_LEVELS = range(0, 101, 10)
-HANDS = (("hourHand", 39, 194), ("minuteHand", 42, 235), ("secondHand", 33, 292))
+HANDS = ("hourHand", "minuteHand", "secondHand")
+ZIP_DATE = (1980, 1, 1, 0, 0, 0)  # A fixed date, so the same face always gives the same bytes.
 
 
 def solid(color: int) -> dict:
@@ -167,6 +168,14 @@ def blank(width: int, height: int) -> bytes:
     return png(Image.new("RGBA", (width, height)))
 
 
+def _add(archive: zipfile.ZipFile, name: str, data: str | bytes) -> None:
+    info = zipfile.ZipInfo(name, ZIP_DATE)
+    info.compress_type = zipfile.ZIP_DEFLATED
+    info.create_system = 0
+    info.external_attr = 0o600 << 16
+    archive.writestr(info, data)
+
+
 def write_face(
     path: str | Path,
     spec: dict,
@@ -186,20 +195,20 @@ def write_face(
         for element in spec["elements"].values():
             if "font" in element and not element["font"]["family"].startswith(FONT_DIR):
                 element["font"]["family"] = family
-    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
-        z.writestr(SPEC_NAME, json.dumps(spec, indent=2))
-        z.writestr(DIAL_NAME, png(dial))
+    with zipfile.ZipFile(path, "w") as z:
+        _add(z, SPEC_NAME, json.dumps(spec, indent=2))
+        _add(z, DIAL_NAME, png(dial))
         if family:
-            z.writestr(family, font_data)
-        for name, width, height in HANDS:
-            z.writestr("/resourceImage/%s.png" % name, blank(width, height))
+            _add(z, family, font_data)
+        for name in HANDS:
+            size = spec["elements"][name]["resourceImage"]
+            _add(z, "/resourceImage/%s.png" % name, blank(size["width"], size["height"]))
         for name in ("connected", "disconnected"):
-            z.writestr(
-                "/resourceImage/connectionResource/%s.png" % name, blank(BLANK_RESOURCE, BLANK_RESOURCE)
-            )
+            art = blank(BLANK_RESOURCE, BLANK_RESOURCE)
+            _add(z, "/resourceImage/connectionResource/%s.png" % name, art)
         for level in BATTERY_LEVELS:
             art = png(battery(level)) if battery else blank(BLANK_RESOURCE, BLANK_RESOURCE)
-            z.writestr("/resourceImage/batteryResource/percent_%d.png" % level, art)
+            _add(z, "/resourceImage/batteryResource/percent_%d.png" % level, art)
 
 
 @dataclass
@@ -218,39 +227,50 @@ class Face:
     def extract_font(self, folder_path: str | Path) -> str | None:
         """Save the bundled font to a folder and return its path, or None if there isn't one."""
         for name, data in self.files.items():
-            if name.startswith(FONT_DIR):
+            if name.startswith(FONT_DIR) and not name.endswith("/"):
                 out = Path(folder_path) / Path(name).name
                 out.write_bytes(data)
                 return str(out)
         return None
 
 
-def read_face(path: str | Path) -> Face:
+def _read_files(path: str | Path) -> dict[str, bytes]:
     with zipfile.ZipFile(path) as archive:
-        files = {name: archive.read(name) for name in archive.namelist()}
+        return {name: archive.read(name) for name in archive.namelist()}
+
+
+def _shape_problems(spec: object) -> list[str]:
+    if not isinstance(spec, dict) or not isinstance(spec.get("elements"), dict):
+        return ["%s has no elements" % SPEC_NAME]
+    return ["%s is not an element" % n for n, e in spec["elements"].items() if not isinstance(e, dict)]
+
+
+def read_face(path: str | Path) -> Face:
+    files = _read_files(path)
     for name in (SPEC_NAME, DIAL_NAME):
         if name not in files:
             raise ValueError("%s has no %s" % (path, name))
-    return Face(json.loads(files[SPEC_NAME]), Image.open(BytesIO(files[DIAL_NAME])).convert("RGB"), files)
+    spec = json.loads(files[SPEC_NAME])
+    problems = _shape_problems(spec)
+    if problems:
+        raise ValueError("; ".join(problems))
+    return Face(spec, Image.open(BytesIO(files[DIAL_NAME])).convert("RGB"), files)
 
 
 def check_face(path: str | Path) -> list[str]:
     """What would stop the app loading this face, or show up wrong. An empty list is good."""
     try:
-        with zipfile.ZipFile(path) as archive:
-            files = {name: archive.read(name) for name in archive.namelist()}
+        files = _read_files(path)
         spec = json.loads(files[SPEC_NAME])
     except (OSError, zipfile.BadZipFile, KeyError, ValueError) as error:
         return ["not a readable .tbwf: %s" % error]
+    problems = _shape_problems(spec)
     if not isinstance(spec, dict) or not isinstance(spec.get("elements"), dict):
-        return ["%s has no elements" % SPEC_NAME]
+        return problems
     elements = spec["elements"]
-    problems = ["missing element: %s" % name for name in default_spec()["elements"].keys() - elements.keys()]
+    problems += ["missing element: %s" % name for name in default_spec()["elements"].keys() - elements.keys()]
     for name, element in elements.items():
-        if not isinstance(element, dict):
-            problems.append("%s is not an element" % name)
-            continue
-        font = element.get("font")
+        font = element.get("font") if isinstance(element, dict) else None
         family = font.get("family") if isinstance(font, dict) else None
         if isinstance(family, str) and family.startswith(FONT_DIR) and family not in files:
             problems.append("%s names a font that isn't in the file: %s" % (name, family))

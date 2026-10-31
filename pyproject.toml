@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [project]
@@ -22,7 +22,7 @@ classifiers = [
 dependencies = ["Pillow>=10.1", "fonttools>=4.40"]
 
 [project.optional-dependencies]
-ble = ["bleak>=0.22"]
+ble = ["bleak>=0.22,<4"]
 dev = ["pytest>=8", "ruff==0.17.3", "build>=1.2"]
 
 [project.urls]
@@ -40,7 +40,6 @@ packages = ["src/haylou_tools"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
 
 [tool.ruff]
 line-length = 110

@@ -11,3 +11,5 @@ dist/
 decompiled/
 *.apk
 *.tbwf
+/preview.png
+/my-font.ttf

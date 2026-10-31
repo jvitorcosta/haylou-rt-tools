@@ -115,3 +115,37 @@ def test_read_face_releases_the_file(tmp_path):
     path = face(tmp_path / "f.tbwf")
     tbwf.read_face(path)
     path.unlink()
+
+
+def test_building_twice_gives_identical_bytes(tmp_path):
+    assert face(tmp_path / "a.tbwf").read_bytes() == face(tmp_path / "b.tbwf").read_bytes()
+
+
+def test_entries_have_a_fixed_date(tmp_path):
+    infos = zipfile.ZipFile(face(tmp_path / "f.tbwf")).infolist()
+    assert {info.date_time for info in infos} == {tbwf.ZIP_DATE}
+
+
+def test_entries_are_compressed(tmp_path):
+    infos = zipfile.ZipFile(face(tmp_path / "f.tbwf")).infolist()
+    assert {info.compress_type for info in infos} == {zipfile.ZIP_DEFLATED}
+
+
+@pytest.mark.parametrize("spec", [[1], {"elements": [1]}, {"elements": {"hour": 1}}])
+def test_read_face_refuses_a_wrong_shape(tmp_path, spec):
+    path = tmp_path / "f.tbwf"
+    with zipfile.ZipFile(path, "w") as z:
+        z.writestr(tbwf.SPEC_NAME, json.dumps(spec))
+        z.writestr(tbwf.DIAL_NAME, tbwf.png(Image.new("RGB", (454, 454))))
+    with pytest.raises(ValueError):
+        tbwf.read_face(path)
+
+
+def test_a_font_folder_entry_isnt_taken_for_a_font(tmp_path, font):
+    path = tmp_path / "f.tbwf"
+    with zipfile.ZipFile(path, "w") as z:
+        z.writestr("/font/", "")
+        z.writestr("/font/" + font.name, font.read_bytes())
+        z.writestr(tbwf.SPEC_NAME, json.dumps(tbwf.default_spec()))
+        z.writestr(tbwf.DIAL_NAME, tbwf.png(Image.new("RGB", (454, 454))))
+    assert tbwf.read_face(path).extract_font(tmp_path).endswith(font.name)

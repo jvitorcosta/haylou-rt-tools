@@ -25,18 +25,13 @@ def _show(value: bytes) -> str:
     return "%s  %r" % (value.hex(" "), text) if printable else value.hex(" ")
 
 
-async def scan(seconds: float = 10) -> list:
-    """List what's advertising, strongest first, and return the devices that look like a Haylou."""
+async def scan(seconds: float = 10) -> None:
+    """List what's advertising, strongest first, with a star on what looks like a Haylou."""
     found = await BleakScanner.discover(timeout=seconds, return_adv=True)
-    rows = sorted(found.values(), key=lambda row: -row[1].rssi)
-    watches = []
-    for device, advert in rows:
+    for device, advert in sorted(found.values(), key=lambda row: -row[1].rssi):
         name = advert.local_name or device.name or "?"
         looks_right = any(hint in name.lower() for hint in NAME_HINTS)
         print("%s %s  %4d dBm  %s" % ("*" if looks_right else " ", device.address, advert.rssi, name))
-        if looks_right:
-            watches.append(device)
-    return watches
 
 
 async def survey(address: str) -> None:
@@ -61,6 +56,7 @@ class Session:
         self.state: int | None = None
         self.challenge: int | None = None
         self.key_requested = False
+        self.replied = False
         self._changed = asyncio.Event()
         self._assembler = p.FrameAssembler()
 
@@ -68,21 +64,21 @@ class Session:
         done = self._assembler.feed(bytes(data))
         if done is None:
             return
+        self.replied = True
         print("<- type %d, %d bytes, crc %s" % (done.type, len(done.payload), "ok" if done.crc_ok else "BAD"))
+        if not done.crc_ok:
+            return
         try:
             print("\n".join(p.describe(done.payload)))
             reply = p.fields(done.payload)
+            status = reply.get(5)
+            info = p.fields(status) if reply.get(1) == p.Command.PAIR and isinstance(status, bytes) else None
         except (IndexError, ValueError):
             print("    (payload isn't plain protobuf)")
             return
-        if reply.get(1) == p.Command.PAIR:
-            status = reply.get(5, b"")
-            if not isinstance(status, bytes):
-                return
-            info = p.fields(status)
-            if (info.get(11), info.get(15)) != (self.state, self.challenge):
-                self.state, self.challenge = info.get(11), info.get(15)
-                self._changed.set()
+        if info is not None and (info.get(11), info.get(15)) != (self.state, self.challenge):
+            self.state, self.challenge = info.get(11), info.get(15)
+            self._changed.set()
 
     async def send(self, client: BleakClient, name: str, data: bytes) -> None:
         print("\n-> %s: %s" % (name, data.hex(" ")))
@@ -102,7 +98,7 @@ class Session:
             await client.write_gatt_char(p.ACK_UUID, p.ACK, response=True)
             if self.state in DONE_STATES:
                 return
-            if self.state == p.PairState.WAITING and self.challenge:
+            if self.challenge:
                 self.key_requested = True
                 print("This watch asked for a pairing key, which isn't supported.")
                 return
@@ -111,32 +107,38 @@ class Session:
         async with BleakClient(self.address, timeout=CONNECT_TIMEOUT) as client:
             for uuid in p.REPLY_UUIDS:
                 await client.start_notify(uuid, self._on_reply)
-            await step(self, client)
+            await step(client)
 
 
-async def query(address: str) -> None:
-    async def step(session: Session, client: BleakClient) -> None:
+async def query(address: str) -> bool:
+    """Ask for firmware and battery, and say whether the watch answered."""
+    session = Session(address)
+
+    async def step(client: BleakClient) -> None:
         for command in (p.Command.QUERY_FIRMWARE, p.Command.QUERY_BATTERY):
             await session.send(client, command.name, p.query(command))
             await asyncio.sleep(REPLY_WAIT)
 
-    await Session(address).run(step)
+    await session.run(step)
+    return session.replied
 
 
 async def notify(address: str, title: str, body: str) -> None:
-    async def step(session: Session, client: BleakClient) -> None:
+    session = Session(address)
+
+    async def step(client: BleakClient) -> None:
         await session.send(client, "ALERT", p.notification(title, body))
         await asyncio.sleep(REPLY_WAIT)
         print("Sent. The watch acknowledges alerts even when it doesn't show them.")
 
-    await Session(address).run(step)
+    await session.run(step)
 
 
 async def pair(address: str, code: str, title: str, body: str) -> bool:
     """Pair with the watch's screen on, off the charger, and show an alert to prove it worked."""
     session = Session(address)
 
-    async def step(_: Session, client: BleakClient) -> None:
+    async def step(client: BleakClient) -> None:
         await session.send(client, "AUTH_SEND_KEY", p.query(p.Command.AUTH_SEND_KEY))
         await asyncio.sleep(REPLY_WAIT)
         await session.pair_with_code(client, code)

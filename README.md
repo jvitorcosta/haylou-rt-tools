@@ -5,7 +5,7 @@ watch faces, and preview their main text on your PC using the text layout rules 
 
 There's no official SDK for this watch. Everything here comes from observing the device and studying
 how the Hello Haylou app works, for interoperability with a watch you own. Hello Haylou is an
-independent app by a separate developer. This project isn't connected to that developer or to Haylou.
+independent app by a separate developer.
 
 > [!WARNING]
 > Unofficial, unaffiliated, and no warranty. It deliberately has **no firmware update or direct upload
@@ -19,7 +19,6 @@ independent app by a separate developer. This project isn't connected to that de
 | Read firmware and battery | Tested on a real watch |
 | Pair, and show a text alert in that connection | Tested on a real watch |
 | Import a `.tbwf` through Hello Haylou | Tested with a community face |
-| `scripts/copy_to_phone.ps1` | Current version not yet run on a real phone |
 | Generated faces on the watch | Not yet confirmed on a real screen |
 | Preview of the main text elements | From reading the app; not yet measured against a real screen |
 
@@ -31,56 +30,47 @@ Needs Python 3.10 or newer.
 
 ```bash
 git clone https://github.com/jvitorcosta/haylou-rt-tools
-```
-
-```bash
 cd haylou-rt-tools
-```
-
-```bash
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install ".[ble]"
 ```
 
-The API may change before 1.0.
-
 ## Make a face
+
+Run these from the repository. The font is one this repository includes for its tests.
 
 ```bash
 python examples/minimal_face.py my-face.tbwf
 haylou check my-face.tbwf
-haylou preview my-face.tbwf preview.png --font some-font.ttf
+haylou preview my-face.tbwf preview.png --font tests/data/nunito-black-latin1.ttf
 ```
 
-Copy the file to your phone, open Hello Haylou (paired in Standalone mode), and import it from the
-**Editor** tab. The Custom files tab only takes compiled `.bin` faces and rejects `.tbwf`.
+Copy `my-face.tbwf` to your phone, open Hello Haylou (paired in Standalone mode), and import it from
+the **Editor** tab. The Custom files tab only takes compiled `.bin` faces and rejects `.tbwf`.
 
-On Windows, [scripts/copy_to_phone.ps1](scripts/copy_to_phone.ps1) copies over USB and verifies the
-result.
+The preview draws the time, date and stats in one font. Icons, hands and weather aren't drawn, and
+the command lists anything it skipped.
 
-The preview draws the time, date and stats. Icons, hands and weather aren't drawn, and the command
-lists anything it skipped.
+To go further, copy [examples/minimal_face.py](examples/minimal_face.py) and change what it passes
+to `write_face`: a background image, `font="my-font.ttf"` to bundle a font, or a changed spec.
+[docs/tbwf-format.md](docs/tbwf-format.md) lists every element.
 
-For anything beyond a background, change the spec:
+## Choose a font
 
-```python
-from PIL import Image
-from haylou_tools.render import CENTRE
-from haylou_tools.tbwf import DIAL_SIZE, default_spec, write_face
-
-spec = default_spec()
-spec["elements"]["hour"].update(x=0.45, y=0.3, properties=CENTRE)
-write_face("face.tbwf", spec, Image.open("background.png").resize((DIAL_SIZE, DIAL_SIZE)), font="my-font.ttf")
-```
-
-Bundle only fonts whose licence allows it, and subset them first:
+Bundle only fonts whose licence allows it. The app puts digits in equal-width cells, so a font with a
+thin `1` looks badly spaced. `font-score` measures that, and you should aim for 0.7 or more:
 
 ```bash
-haylou font-score a.ttf b.ttf
-haylou font-subset Nunito-Variable.ttf my-font.ttf --axis wght=900
+haylou font-score tests/data/nunito-black-latin1.ttf
 ```
 
-`font-score` matters more than it sounds: the app puts digits in equal-width cells, so a font with a
-thin `1` looks badly spaced. Aim for 0.7 or more.
+`font-subset` cuts a font you've downloaded down to Latin-1 to keep the face small. With a variable
+font, pin every axis:
+
+```bash
+haylou font-subset downloaded-font.ttf my-font.ttf --axis wght=900
+```
 
 ## Talk to the watch
 
@@ -98,7 +88,8 @@ Pair with the watch off its charger and the screen on. `pair` shows an alert in 
 which is the tested case. It isn't known yet whether `notify` works in a later connection, and the
 watch acknowledges alerts even when it doesn't show them, so only trust what's on the screen.
 
-A watch that asks for a pairing key isn't supported.
+A watch that asks for a pairing key isn't supported. Pairing sends a fixed profile (age 30, 170 cm,
+70 kg), which the watch uses to estimate calories.
 
 ## Documentation
 
@@ -115,4 +106,4 @@ Reports from other watches and firmware versions are the most useful thing you c
 ## Licence
 
 [MIT](LICENSE). Third-party parts are listed in [THIRD_PARTY.md](THIRD_PARTY.md). Haylou and Hello
-Haylou are trademarks or names of their respective owners, and this project isn't connected to them.
+Haylou belong to their respective owners.

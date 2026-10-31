@@ -1,5 +1,4 @@
-from pathlib import Path
-
+from conftest import FONT as FONT_PATH
 from PIL import Image, ImageFont
 
 from haylou_tools import tbwf
@@ -14,7 +13,7 @@ from haylou_tools.render import (
     size_px,
 )
 
-FONT = str(Path(__file__).parent / "data" / "nunito-black-latin1.ttf")
+FONT = str(FONT_PATH)
 DIGITS = CHARSETS["hour"]
 
 
@@ -101,13 +100,13 @@ def test_draw_face_skips_hidden_elements_and_rounds_the_screen():
 
 def test_preview_uses_the_font_bundled_in_the_face(tmp_path):
     spec = tbwf.default_spec()
-    tbwf.write_face(tmp_path / "f.tbwf", spec, Image.new("RGB", (454, 454)), font=Path(FONT))
+    tbwf.write_face(tmp_path / "f.tbwf", spec, Image.new("RGB", (454, 454)), font=FONT_PATH)
     out = tmp_path / "p.png"
     preview_face(tmp_path / "f.tbwf", out)
     assert Image.open(out).size == (240, 240) and Image.open(out).getbbox()
 
 
-def test_preview_of_built_in_fonts_needs_a_stand_in(tmp_path):
+def test_preview_of_built_in_fonts_uses_the_stand_in(tmp_path):
     tbwf.write_face(tmp_path / "f.tbwf", tbwf.default_spec(), Image.new("RGB", (454, 454)))
     out = tmp_path / "p.png"
     preview_face(tmp_path / "f.tbwf", out, font=FONT)

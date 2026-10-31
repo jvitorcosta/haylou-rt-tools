@@ -38,23 +38,17 @@ def _run_ble(name: str, *args):
         raise OSError(str(error)) from error
 
 
-def _scan(args) -> int:
-    _run_ble("scan", args.seconds)
-    return 0
+def _ble_command(name: str, *attributes: str):
+    def run(args) -> int:
+        _run_ble(name, *(getattr(args, attribute) for attribute in attributes))
+        return 0
 
-
-def _survey(args) -> int:
-    _run_ble("survey", args.address)
-    return 0
+    return run
 
 
 def _query(args) -> int:
-    _run_ble("query", args.address)
-    return 0
-
-
-def _notify(args) -> int:
-    _run_ble("notify", args.address, args.title, args.body)
+    if not _run_ble("query", args.address):
+        raise TimeoutError("the watch didn't answer")
     return 0
 
 
@@ -93,7 +87,8 @@ def _axis(value: str) -> tuple[str, float]:
 
 
 def _font_subset(args) -> int:
-    subset_font(args.src, args.out, dict(args.axis))
+    if subset_font(args.src, args.out, dict(args.axis)):
+        print("Still a variable font: pin every axis with --axis.")
     return 0
 
 
@@ -107,10 +102,16 @@ def parser() -> argparse.ArgumentParser:
         command.set_defaults(run=run)
         return command
 
-    add("scan", _scan, "list nearby Bluetooth devices").add_argument("--seconds", type=float, default=10)
-    add("survey", _survey, "list a device's services, read-only").add_argument("address")
+    add("scan", _ble_command("scan", "seconds"), "list nearby Bluetooth devices").add_argument(
+        "--seconds", type=float, default=10
+    )
+    add("survey", _ble_command("survey", "address"), "list a device's services, read-only").add_argument(
+        "address"
+    )
     add("query", _query, "ask for firmware and battery").add_argument("address")
-    notify = add("notify", _notify, "show a text alert on a paired watch")
+    notify = add(
+        "notify", _ble_command("notify", "address", "title", "body"), "show a text alert on a paired watch"
+    )
     notify.add_argument("address")
     notify.add_argument("title")
     notify.add_argument("body")
@@ -125,7 +126,7 @@ def parser() -> argparse.ArgumentParser:
     preview.add_argument("out")
     preview.add_argument("--font", help="stand-in for a face that uses built-in fonts")
     add("font-score", _font_score, "rank fonts by digit evenness").add_argument("fonts", nargs="+")
-    subset = add("font-subset", _font_subset, "make a static Latin-1 font for bundling")
+    subset = add("font-subset", _font_subset, "make a Latin-1 font for bundling")
     subset.add_argument("src")
     subset.add_argument("out")
     subset.add_argument("--axis", type=_axis, action="append", default=[], help="pin an axis, as wght=900")
@@ -139,7 +140,7 @@ def main(argv: list[str] | None = None) -> int:
     except KeyboardInterrupt:
         return 130
     except EXPECTED_ERRORS as error:
-        print("haylou: error: %s" % error, file=sys.stderr)
+        print("haylou: error: %s" % (str(error) or "timed out"), file=sys.stderr)
         return 1
 
 

@@ -59,6 +59,11 @@ def size_px(element: dict, width: int = DIAL_SIZE) -> int:
     return int(width * element["font"]["size"])
 
 
+def require_font(path: str | Path) -> None:
+    if not Path(path).is_file():
+        raise FileNotFoundError("font not found: %s" % path)
+
+
 @cache
 def ink_box(font_path: str, size: int, value: str) -> tuple[int, int, int, int]:
     """Ink bounds from the origin on the baseline, like Android's getTextBounds.
@@ -131,13 +136,16 @@ def draw_face(dial: Image.Image, spec: dict, values: dict, font_path: str) -> Im
     """Draw `values` on the dial, cut to the round screen. An Image value pastes at its element."""
     img = dial.convert("RGB")
     for name, value in values.items():
-        element = spec["elements"][name]
-        if not element["visible"]:
-            continue
-        if isinstance(value, Image.Image):
-            img.paste(value, (int(element["x"] * DIAL_SIZE), int(element["y"] * DIAL_SIZE)), value)
-        else:
-            draw_value(img, element, value, CHARSETS[name], font_path, name == "dayOfWeek")
+        try:
+            element = spec["elements"][name]
+            if not element["visible"]:
+                continue
+            if isinstance(value, Image.Image):
+                img.paste(value, (int(element["x"] * DIAL_SIZE), int(element["y"] * DIAL_SIZE)), value)
+            else:
+                draw_value(img, element, value, CHARSETS[name], font_path, name == "dayOfWeek")
+        except (KeyError, TypeError, AttributeError) as error:
+            raise ValueError("can't draw %s: %r" % (name, error)) from error
     mask = Image.new("L", img.size)
     ImageDraw.Draw(mask).ellipse((0, 0, img.width - 1, img.height - 1), fill=255)
     out = Image.new("RGB", img.size)
@@ -148,8 +156,11 @@ def draw_face(dial: Image.Image, spec: dict, values: dict, font_path: str) -> Im
 def preview_face(path: str | Path, out: str | Path, font: str | Path | None = None) -> list[str]:
     """Save a screen-sized preview and return the visible elements it couldn't draw.
 
-    Built-in fonts aren't available on a PC, so give `font` as a stand-in for those.
+    Built-in fonts aren't available on a PC, so give `font` as a stand-in for those. Only one font
+    is used, even if the face bundles more.
     """
+    if font:
+        require_font(font)
     face = read_face(path)
     values = dict(SAMPLE_VALUES)
     gauge = face.battery_image(80)

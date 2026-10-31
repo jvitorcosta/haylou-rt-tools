@@ -81,7 +81,7 @@ def test_describe_shows_nested_and_text_fields():
 
 def test_commands_are_exactly_the_safe_list():
     # The one rule of this project, see SECURITY.md: a new command must be added here on purpose.
-    assert {command.value for command in p.Command} == {1, 2, 19, 21, 31, 52}
+    assert {command.value for command in p.Command} == {1, 2, 19, 21, 31}
 
 
 def test_no_source_mentions_the_firmware_service():

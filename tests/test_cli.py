@@ -1,4 +1,5 @@
 import runpy
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -87,3 +88,66 @@ def test_subset_refuses_to_overwrite_its_source(font, tmp_path):
 def test_preview_names_what_it_did_not_draw(face, tmp_path, capsys):
     assert main(["preview", str(face), str(tmp_path / "p.png")]) == 0
     assert "stepResource" in capsys.readouterr().out
+
+
+def test_a_timeout_says_so(monkeypatch, capsys):
+    def time_out(*_):
+        raise TimeoutError
+
+    monkeypatch.setattr("haylou_tools.cli._run_ble", time_out)
+    assert main(["query", "AA:BB:CC:DD:EE:FF"]) == 1
+    assert "timed out" in capsys.readouterr().err
+
+
+def test_preview_of_a_wrong_shape_is_a_message(tmp_path, capsys):
+    path = tmp_path / "f.tbwf"
+    with zipfile.ZipFile(path, "w") as z:
+        z.writestr(tbwf.SPEC_NAME, "[1]")
+        z.writestr(tbwf.DIAL_NAME, tbwf.png(Image.new("RGB", (454, 454))))
+    assert main(["preview", str(path), str(tmp_path / "p.png")]) == 1
+    assert "haylou: error" in capsys.readouterr().err
+
+
+def test_preview_of_a_missing_key_is_a_message(tmp_path, font, capsys):
+    spec = tbwf.default_spec()
+    del spec["elements"]["hour"]["color"]
+    path = tmp_path / "f.tbwf"
+    tbwf.write_face(path, spec, Image.new("RGB", (454, 454)), font=font)
+    assert main(["preview", str(path), str(tmp_path / "p.png")]) == 1
+    assert "hour" in capsys.readouterr().err
+
+
+def test_a_missing_font_is_named(tmp_path, capsys):
+    assert main(["font-score", str(tmp_path / "gone.ttf")]) == 1
+    assert "gone.ttf" in capsys.readouterr().err
+
+
+def test_a_missing_stand_in_font_is_named(face, tmp_path, capsys):
+    assert main(["preview", str(face), str(tmp_path / "p.png"), "--font", "gone.ttf"]) == 1
+    assert "gone.ttf" in capsys.readouterr().err
+
+
+def test_a_query_with_no_reply_fails(monkeypatch):
+    async def silent(_):
+        return False
+
+    pytest.importorskip("bleak")
+    monkeypatch.setattr("haylou_tools.ble.query", silent)
+    assert main(["query", "AA:BB:CC:DD:EE:FF"]) == 1
+
+
+def test_bluetooth_errors_are_messages(monkeypatch, capsys):
+    ble = pytest.importorskip("haylou_tools.ble")
+
+    async def fail(_):
+        raise ble.BleakError("not found")
+
+    monkeypatch.setattr(ble, "survey", fail)
+    assert main(["survey", "AA:BB:CC:DD:EE:FF"]) == 1
+    assert "not found" in capsys.readouterr().err
+
+
+def test_a_partly_pinned_font_warns(monkeypatch, capsys, tmp_path, font):
+    monkeypatch.setattr("haylou_tools.cli.subset_font", lambda *_: True)
+    assert main(["font-subset", str(font), str(tmp_path / "o.ttf"), "--axis", "wght=700"]) == 0
+    assert "pin every axis" in capsys.readouterr().out

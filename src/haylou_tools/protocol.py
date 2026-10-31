@@ -20,6 +20,8 @@ REQUEST_TYPE = 3
 HEADER_SIZE = 9
 ALERT_MESSAGE = 14
 _ID_THIRD_BYTE = 176
+# Tag and value: gender, age, height, weight, wrist, then a zero. The watch estimates calories from it.
+_PROFILE = ((0x10, 1), (0x18, 30), (0x20, 170), (0x28, 70), (0x30, 0), (0x38, 0))
 
 
 class Command(IntEnum):
@@ -28,7 +30,6 @@ class Command(IntEnum):
     ALERT = 19
     QUERY_BATTERY = 21
     AUTH_SEND_KEY = 31
-    QUERY_DEVICE_PARAMETERS = 52
 
 
 class PairState(IntEnum):
@@ -37,17 +38,6 @@ class PairState(IntEnum):
     WANTS_KEY = 3
     FAILED_KEY = 4
     WAITING = 5
-
-
-@dataclass(frozen=True)
-class Profile:
-    """The user info sent while pairing. The watch uses it to estimate calories and distance."""
-
-    gender: int = 1
-    age: int = 30
-    height_cm: int = 170
-    weight_kg: int = 70
-    wrist: int = 0
 
 
 @dataclass(frozen=True)
@@ -173,43 +163,21 @@ def notification(title: str, body: str, now: int | None = None, utc_offset: int 
     return frame(alert + b"\xba\x01" + varint(len(inner)) + inner + timezone_field(utc_offset))
 
 
-def pairing(
-    code: str,
-    profile: Profile | None = None,
-    now: int | None = None,
-    utc_offset: int | None = None,
-) -> bytes:
-    """Command 1 with a zero key, which is all a watch has needed so far.
+def pairing(code: str, now: int | None = None, utc_offset: int | None = None) -> bytes:
+    """Command 1 with a fixed profile and a zero key, which is all a watch has needed so far.
 
     A watch can answer with a challenge, which needs a key this project doesn't implement.
     """
     if len(code) != 4 or not (code.isascii() and code.isdigit()):
         raise ValueError("the pairing code must be 4 digits")
     now, utc_offset = _clock(now, utc_offset)
-    user = profile or Profile()
     code_hash = 0
     for c in code:
         code_hash = code_hash * 31 + ord(c)
     # The id's third byte follows from the code; the other bytes are what the app sends.
-    body = (
-        b"\x08\xba\xc2"
-        + bytes((_ID_THIRD_BYTE + code_hash % 10,))
-        + b"\x05"
-        + b"\x10"
-        + varint(user.gender)
-        + b"\x18"
-        + varint(user.age)
-        + b"\x20"
-        + varint(user.height_cm)
-        + b"\x28"
-        + varint(user.weight_kg)
-        + b"\x30"
-        + varint(user.wrist)
-        + b"\x38"
-        + varint(0)
-        + b"\x42\x0c"
-        + bytes(12)
-    )
+    identity = b"\x08\xba\xc2" + bytes((_ID_THIRD_BYTE + code_hash % 10,)) + b"\x05"
+    body = identity + b"".join(bytes((tag,)) + varint(value) for tag, value in _PROFILE)
+    body += b"\x42\x0c" + bytes(12)
     head = b"\x08" + varint(Command.PAIR) + b"\x10\x00\x18" + varint(now)
     return frame(head + b"\x22" + varint(len(body)) + body + timezone_field(utc_offset))
 

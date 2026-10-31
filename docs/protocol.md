@@ -46,7 +46,6 @@ varint west of it. The watch's time in replies looks like local time written as 
 | Text alert | 19 |
 | Query battery | 21 |
 | Auth send key (changes nothing, just a query) | 31 |
-| Query device parameters | 52 |
 
 A query is `{1: id, 2: 0, 3: unix seconds}` plus the timezone. The watch answers with
 `66 77 00 00 00 00 00` on `03ff`, then a frame on `05ff`. Firmware is in reply field 6, and battery in

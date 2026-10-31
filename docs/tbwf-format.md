@@ -61,8 +61,3 @@ An unknown family without its file falls back to sans-serif.
 | 1, 2, 4 | `dayOfWeek` | Short (`Fri`), full (`Friday`), narrow (`F`) |
 | 4 | `battery` | Adds a shrunk `%` |
 | 16, 32, 64 | Images | Fit, crop, stretch |
-
-## Compiled faces
-
-Compiled faces start with `dial FF FF FF FF`, then `TiBoWf10`, sizes, a table of elements and the
-images. This project doesn't write them: the app does that safely.
