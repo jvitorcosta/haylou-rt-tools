@@ -1,0 +1,27 @@
+name: Watch report
+description: Tell us what worked, or didn't, on your watch
+labels: ["watch report"]
+body:
+  - type: input
+    id: watch
+    attributes:
+      label: Watch model
+      placeholder: Haylou RT (LS05S)
+    validations:
+      required: true
+  - type: input
+    id: firmware
+    attributes:
+      label: Firmware version
+      description: From `haylou query`. Leave out your Bluetooth address.
+  - type: input
+    id: app
+    attributes:
+      label: Hello Haylou version
+  - type: textarea
+    id: result
+    attributes:
+      label: What worked, and what didn't
+      description: A photo of a face beside its `haylou preview` is very useful.
+    validations:
+      required: true

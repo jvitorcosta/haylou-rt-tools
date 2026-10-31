@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+build/
+dist/
+*.egg-info/
+
+# Keep decompiled apps and your own faces out of the repository.
+decompiled/
+*.apk
+*.tbwf
