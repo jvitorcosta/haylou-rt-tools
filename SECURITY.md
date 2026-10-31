@@ -33,5 +33,8 @@ or assets from Hello Haylou. Its protocol knowledge did come from decompiling th
 [docs/reverse-engineering.md](docs/reverse-engineering.md)), so some details necessarily match it:
 UUIDs, command ids, and file format names and values.
 
+It doesn't bypass Hello Haylou's Premium mode, ads or any licence check, and changes that do won't
+be merged.
+
 Rules on reverse engineering vary by country, and you're responsible for following yours. If
 you represent a rights holder and have a concern, please open an issue.

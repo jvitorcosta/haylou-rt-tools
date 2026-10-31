@@ -22,7 +22,7 @@ DAYS_EN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 DAYS_PT = ["dom.", "seg.", "ter.", "qua.", "qui.", "sex.", "sáb."]
 NUMBER = "0123456789"
 # What the app measures per element, separators included, not only what the element shows.
-# Copied as the app has them, repeated colon included.
+# The repeated colon matches what the app measures.
 DATE_SET = NUMBER + ",-:/"
 STAT_SET = NUMBER + ",- ::/"
 CHARSETS = {

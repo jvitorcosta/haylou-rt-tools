@@ -4,7 +4,8 @@ Unofficial tools for the **Haylou RT (LS05S)** smartwatch: talk to it over Bluet
 watch faces, and preview their main text on your PC using the text layout rules of the phone app.
 
 There's no official SDK for this watch. Everything here comes from observing the device and studying
-how the Hello Haylou app works, for interoperability with a watch you own.
+how the Hello Haylou app works, for interoperability with a watch you own. Hello Haylou is an
+independent app by a separate developer. This project isn't connected to that developer or to Haylou.
 
 > [!WARNING]
 > Unofficial, unaffiliated, and no warranty. It deliberately has **no firmware update or direct upload
@@ -18,7 +19,7 @@ how the Hello Haylou app works, for interoperability with a watch you own.
 | Read firmware and battery | Tested on a real watch |
 | Pair, and show a text alert in that connection | Tested on a real watch |
 | Import a `.tbwf` through Hello Haylou | Tested with a community face |
-| `scripts/copy_to_phone.ps1` | Run on a real phone (see the changelog) |
+| `scripts/copy_to_phone.ps1` | Current version not yet run on a real phone |
 | Generated faces on the watch | Not yet confirmed on a real screen |
 | Preview of the main text elements | From reading the app; not yet measured against a real screen |
 

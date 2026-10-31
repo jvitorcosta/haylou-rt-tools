@@ -13,7 +13,7 @@ This is the method, in case you want to extend it to another watch.
 4. **Choose the safest route.** Sending a compiled face directly looked possible but could go wrong
    in ways that are hard to recover from. Community `.tbwf` files showed the app could do that part,
    so this project only writes a file format and leaves uploading to the app.
-5. **Copy the app's drawing rules.** Generated faces looked misaligned because the preview guessed at
+5. **Reimplement the app's drawing rules.** Generated faces looked misaligned because the preview guessed at
    text layout. Reading the app's drawing code gave the [real rules](drawing-rules.md).
 
 ## Lessons
