@@ -3,6 +3,8 @@
 Unofficial tools for the **Haylou RT (LS05S)** smartwatch: talk to it over Bluetooth, build custom
 watch faces, and preview their main text on your PC using the text layout rules of the phone app.
 
+**Status:** early
+
 There's no official SDK for this watch. Everything here comes from observing the device and studying
 how the Hello Haylou app works, for interoperability with a watch you own. Hello Haylou is an
 independent app by a separate developer.
@@ -11,6 +13,10 @@ independent app by a separate developer.
 > Unofficial, unaffiliated, and no warranty. It deliberately has **no firmware update or direct upload
 > code**, so it can't flash your watch, but pairing can replace an existing pairing, and unpairing
 > deletes the data on the watch. Read [SECURITY.md](SECURITY.md).
+
+## Why I built it
+
+The Haylou RT has no official SDK, so I worked out how the watch and its app talk and wrote these tools to build and preview my own watch faces.
 
 ## What works
 
